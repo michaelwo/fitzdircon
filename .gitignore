@@ -12,3 +12,7 @@ release.p12
 .classpath
 .project
 .settings/
+
+# Local tooling
+.claude/
+scripts/
