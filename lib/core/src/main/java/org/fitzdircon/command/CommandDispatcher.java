@@ -43,7 +43,7 @@ public class CommandDispatcher {
         this.clock    = System::currentTimeMillis;
         this.executor = executor;
         scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "QZ:DrainThread");
+            Thread t = new Thread(r, "FZ:DrainThread");
             t.setDaemon(true);
             return t;
         });

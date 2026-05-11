@@ -21,7 +21,7 @@ public class CrashHandler implements Thread.UncaughtExceptionHandler {
         throwable.printStackTrace(pw);
         String stackTraceString = sw.toString();
 
-        Log.e("QZ:Crash", "Uncaught exception on thread " + thread.getName() + ": " + stackTraceString);
+        Log.e("FZ:Crash", "Uncaught exception on thread " + thread.getName() + ": " + stackTraceString);
 
         SharedPreferences prefs = context.getSharedPreferences("CrashPrefs", Context.MODE_PRIVATE);
         prefs.edit().putString("last_crash", stackTraceString).apply();

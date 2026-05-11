@@ -11,7 +11,7 @@ import java.util.function.Consumer;
  * Process-wide fanout wrapper for telemetry.
  *
  * The hub owns one committed reader (configured by {@link #configure}) and fans its telemetry
- * to QZ UDP output, device state, and calibration. The reader is selected once based on the
+ * to Direct Connect, device state, and telemetry subscribers. The reader is selected once based on the
  * detected iFit platform — there is no fallback.
  */
 public final class TelemetryHub {
