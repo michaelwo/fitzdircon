@@ -27,8 +27,9 @@ android {
         versionCode (project.hasProperty('versionCode') ? project.versionCode.toInteger() : 1)
         versionName versionProps['versionName']
 
-        buildConfigField "boolean", "IS_CI_BUILD", "${project.hasProperty('versionCode')}"
-        buildConfigField "String",  "GIT_HASH",    "\"${gitHash()}\""
+        buildConfigField "boolean", "IS_CI_BUILD",     "${project.hasProperty('versionCode')}"
+        buildConfigField "String",  "GIT_HASH",        "\"${gitHash()}\""
+        buildConfigField "String",  "GITHUB_REPO_URL", '"https://github.com/michaelwo/fitzdircon"'
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -39,6 +39,7 @@ public class ZwiftDirectConnectService extends Service {
     private static volatile boolean advertising = false;
     private static volatile String connectedClient = null;
     private static volatile String lastError = null;
+    private static volatile ZwiftDirectConnectService instance = null;
 
     private NsdManager nsdManager;
     private NsdManager.RegistrationListener registrationListener;
@@ -53,9 +54,14 @@ public class ZwiftDirectConnectService extends Service {
     public static boolean isAdvertising() { return advertising; }
     public static String connectedClient() { return connectedClient; }
     public static String lastError() { return lastError; }
+    public static DirectConnectTrainerState trainerState() {
+        ZwiftDirectConnectService s = instance;
+        return s != null ? s.trainerState : null;
+    }
 
     @Override
     public void onCreate() {
+        instance = this;
         nsdManager = (NsdManager) getSystemService(Context.NSD_SERVICE);
     }
 
@@ -202,6 +208,7 @@ public class ZwiftDirectConnectService extends Service {
 
     @Override
     public void onDestroy() {
+        instance = null;
         stopDirectConnect();
     }
 

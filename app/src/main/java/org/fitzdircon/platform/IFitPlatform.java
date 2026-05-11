@@ -38,10 +38,12 @@ public final class IFitPlatform {
 
     public final boolean available;
     public final MachineClass machineClass;
+    public final String diagnostics;
 
-    private IFitPlatform(boolean available, MachineClass machineClass) {
+    private IFitPlatform(boolean available, MachineClass machineClass, String diagnostics) {
         this.available    = available;
         this.machineClass = machineClass;
+        this.diagnostics  = diagnostics;
     }
 
     public static IFitPlatform detect(Context context) {
@@ -51,11 +53,11 @@ public final class IFitPlatform {
             credentials = GrpcCredentials.load(appContext);
         } catch (Exception e) {
             Log.i(LOG_TAG, "iFit2 credentials unavailable: " + e.getMessage());
-            return new IFitPlatform(false, MachineClass.UNKNOWN);
+            return new IFitPlatform(false, MachineClass.UNKNOWN, e.getMessage());
         }
         MachineClass mc = queryMachineClass(credentials);
         Log.i(LOG_TAG, "detected: iFit2 gRPC / " + mc);
-        return new IFitPlatform(true, mc);
+        return new IFitPlatform(true, mc, null);
     }
 
     private static MachineClass queryMachineClass(GrpcCredentials credentials) {
