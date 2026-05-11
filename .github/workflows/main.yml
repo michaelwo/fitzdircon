@@ -65,7 +65,7 @@ jobs:
 
       - name: Build signed release APK
         env:
-          KEYSTORE_PATH: release.p12
+          KEYSTORE_PATH: ${{ github.workspace }}/release.p12
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
