@@ -12,3 +12,6 @@ release.p12
 .classpath
 .project
 .settings/
+
+# Gradle wrapper JAR (downloaded automatically)
+gradle/wrapper/gradle-wrapper.jar
