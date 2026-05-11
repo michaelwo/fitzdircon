@@ -1,7 +1,6 @@
 package org.fitzdircon.device;
 
 import org.fitzdircon.command.Command;
-import org.fitzdircon.telemetry.Telemetry;
 
 public abstract class Device {
     /** Functional interface for log output. Level constants match android.util.Log values. */
@@ -18,12 +17,6 @@ public abstract class Device {
     public Logger logger = (level, tag, msg) -> {};
 
     public abstract String displayName();
-
-    /** Returns a log label for confirmed telemetry this device handles, or null to suppress logging. */
-    public String telemetryLabel(Telemetry t) { return null; }
-
-    /** Handles a live telemetry update. */
-    public void applyTelemetry(Telemetry telemetry) {}
 
     /** Applies a command to this device via gRPC. */
     public void applyCommand(Command cmd) {}
