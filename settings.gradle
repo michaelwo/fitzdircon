@@ -1,4 +1,5 @@
 include ':app'
 include ':lib:core'
+include ':lib:dircon'
 include ':lib:ifit2'
 rootProject.name = "fitzdircon"

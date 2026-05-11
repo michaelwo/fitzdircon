@@ -69,7 +69,7 @@ android {
 }
 
 dependencies {
-    implementation project(':lib:core')
+    implementation project(':lib:dircon')
     implementation project(':lib:ifit2')
 
     implementation "androidx.core:core-ktx:1.12.0"
