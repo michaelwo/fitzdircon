@@ -9,7 +9,6 @@ import android.os.IBinder;
 import android.util.Log;
 
 import org.fitzdircon.command.Command;
-import org.fitzdircon.ui.MainActivity;
 import org.fitzdircon.dircon.DirectConnectPacket;
 import org.fitzdircon.dircon.DirectConnectProfile;
 import org.fitzdircon.dircon.DirectConnectServiceInfo;
@@ -45,7 +44,6 @@ public class ZwiftDirectConnectService extends Service {
     private NsdManager.RegistrationListener registrationListener;
     private ServerSocket serverSocket;
     private Thread serverThread;
-    private volatile boolean shouldRun = false;
     private volatile ClientSession clientSession = null;
     private TelemetryHub.Subscription telemetrySubscription = null;
     private final DirectConnectTrainerState trainerState = new DirectConnectTrainerState();
@@ -69,7 +67,6 @@ public class ZwiftDirectConnectService extends Service {
 
     private synchronized void startDirectConnect() {
         if (running) return;
-        shouldRun = true;
         running = true;
         lastError = null;
         subscribeTelemetry();
@@ -154,7 +151,7 @@ public class ZwiftDirectConnectService extends Service {
             try {
                 serverSocket = new ServerSocket(DirectConnectServiceInfo.DEFAULT_PORT);
                 Log.i(LOG_TAG, "TCP listening on " + DirectConnectServiceInfo.DEFAULT_PORT);
-                while (shouldRun) {
+                while (running) {
                     Socket socket = serverSocket.accept();
                     if (clientSession != null && clientSession.isOpen()) {
                         Log.w(LOG_TAG, "rejecting second Direct Connect client: "
@@ -166,7 +163,7 @@ public class ZwiftDirectConnectService extends Service {
                     clientSession.start();
                 }
             } catch (IOException e) {
-                if (shouldRun) {
+                if (running) {
                     lastError = "TCP server error: " + e.getMessage();
                     Log.e(LOG_TAG, lastError, e);
                 }
@@ -176,7 +173,6 @@ public class ZwiftDirectConnectService extends Service {
     }
 
     private synchronized void stopDirectConnect() {
-        shouldRun = false;
         running = false;
         advertising = false;
         connectedClient = null;
@@ -243,12 +239,12 @@ public class ZwiftDirectConnectService extends Service {
                 byte[] readBuffer = new byte[4096];
                 ByteArrayOutputStream pending = new ByteArrayOutputStream();
                 int read;
-                while (shouldRun && (read = input.read(readBuffer)) >= 0) {
+                while (running && (read = input.read(readBuffer)) >= 0) {
                     pending.write(readBuffer, 0, read);
                     processPending(pending);
                 }
             } catch (IOException e) {
-                if (shouldRun) Log.w(LOG_TAG, "client session ended: " + e.getMessage());
+                if (running) Log.w(LOG_TAG, "client session ended: " + e.getMessage());
             } finally {
                 close();
                 if (clientSession == this) clientSession = null;
@@ -261,11 +257,10 @@ public class ZwiftDirectConnectService extends Service {
             byte[] bytes = pending.toByteArray();
             int offset = 0;
             while (offset < bytes.length) {
-                byte[] remaining = java.util.Arrays.copyOfRange(bytes, offset, bytes.length);
                 DirectConnectPacket.ParseResult parsed =
-                        DirectConnectPacket.parse(remaining, sequenceNumber);
+                        DirectConnectPacket.parse(bytes, offset, sequenceNumber);
                 if (parsed.status == DirectConnectPacket.ParseResult.WAIT) break;
-                int consumed = parsed.consumed > 0 ? parsed.consumed : remaining.length;
+                int consumed = parsed.consumed > 0 ? parsed.consumed : bytes.length - offset;
                 offset += consumed;
                 if (parsed.status == DirectConnectPacket.ParseResult.ERROR) {
                     sendUnexpectedError(parsed.packet);
@@ -278,7 +273,7 @@ public class ZwiftDirectConnectService extends Service {
         }
 
         private void handlePacket(DirectConnectPacket packet) {
-            if (MainActivity.isDebugLog()) {
+            if (Log.isLoggable(LOG_TAG, Log.DEBUG)) {
                 Log.d(LOG_TAG, "packet id=" + packet.identifier + " uuid="
                         + Integer.toHexString(packet.uuid) + " req=" + packet.request);
             }

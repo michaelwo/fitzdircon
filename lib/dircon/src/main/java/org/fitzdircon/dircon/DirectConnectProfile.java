@@ -214,9 +214,7 @@ public final class DirectConnectProfile {
             commands.add(new InclineCommand(rawGrade / 100.0f));
         } else if (op == FTMS_SET_TARGET_POWER && data.length >= 3) {
             lastTargetPowerWatts = (float) ((data[1] & 0xFF) | ((data[2] & 0xFF) << 8));
-            result = FTMS_SUCCESS;
         } else if (op == FTMS_REQUEST_CONTROL || op == FTMS_START_RESUME || op == FTMS_STOP_PAUSE) {
-            result = FTMS_SUCCESS;
         } else {
             result = FTMS_NOT_SUPPORTED;
         }

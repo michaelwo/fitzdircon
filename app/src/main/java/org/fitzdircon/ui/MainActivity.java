@@ -22,6 +22,7 @@ import org.fitzdircon.R;
 import org.fitzdircon.device.Device;
 import org.fitzdircon.device.DeviceController;
 import org.fitzdircon.dircon.DirectConnectCommandBridge;
+import org.fitzdircon.dircon.DirectConnectServiceInfo;
 import org.fitzdircon.dircon.ZwiftDirectConnectService;
 import org.fitzdircon.platform.IFitPlatform;
 import org.fitzdircon.platform.crash.CrashHandler;
@@ -34,6 +35,7 @@ public class MainActivity extends AppCompatActivity {
     private static SharedPreferences sharedPreferences;
     private IFitPlatform platform;
     private DeviceController activeController = null;
+    private String localIpAddress = null;
 
     private final android.os.Handler heartbeatHandler =
             new android.os.Handler(android.os.Looper.getMainLooper());
@@ -45,6 +47,7 @@ public class MainActivity extends AppCompatActivity {
     };
 
     public static final String PREF_DIRECT_CONNECT = ZwiftDirectConnectService.PREF_ENABLED;
+    private static final String PREFS_FILE = "fitzdircon";
     public static SharedPreferences prefs() { return sharedPreferences; }
 
     @Override
@@ -52,7 +55,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         Thread.setDefaultUncaughtExceptionHandler(new CrashHandler(this));
-        sharedPreferences = getSharedPreferences("fitzdircon", MODE_PRIVATE);
+        sharedPreferences = getSharedPreferences(PREFS_FILE, MODE_PRIVATE);
 
         if (getSupportActionBar() != null) {
             String buildId = BuildConfig.IS_CI_BUILD
@@ -74,6 +77,7 @@ public class MainActivity extends AppCompatActivity {
             Log.i(LOG_TAG, "iFit2 not available — Direct Connect inactive");
         }
 
+        localIpAddress = getLocalIpAddress();
         startDirectConnect();
         updateStatusList();
     }
@@ -139,7 +143,7 @@ public class MainActivity extends AppCompatActivity {
                     deviceName);
         }
 
-        addRow(list, true, "Local IP", getLocalIpAddress());
+        addRow(list, true, "Local IP", localIpAddress != null ? localIpAddress : "no IP");
 
         boolean dcEnabled = sharedPreferences.getBoolean(PREF_DIRECT_CONNECT, true);
         boolean dcConnected = ZwiftDirectConnectService.connectedClient() != null;
@@ -150,7 +154,8 @@ public class MainActivity extends AppCompatActivity {
         } else if (dcConnected) {
             dcDetail = "Connected to Zwift client " + ZwiftDirectConnectService.connectedClient();
         } else if (dcAdvertising) {
-            dcDetail = "Advertising _wahoo-fitness-tnp._tcp on port 36866";
+            dcDetail = "Advertising " + DirectConnectServiceInfo.SERVICE_TYPE
+                    + " on port " + DirectConnectServiceInfo.DEFAULT_PORT;
         } else if (ZwiftDirectConnectService.lastError() != null) {
             dcDetail = ZwiftDirectConnectService.lastError();
         } else {
@@ -179,7 +184,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         } catch (Exception ignored) {}
-        return "no IP";
+        return null;
     }
 
     private void addRow(LinearLayout container, boolean ok, String name, String detail) {

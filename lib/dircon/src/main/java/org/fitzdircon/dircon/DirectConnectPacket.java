@@ -75,19 +75,23 @@ public final class DirectConnectPacket {
     }
 
     public static ParseResult parse(byte[] buffer, int lastSequenceNumber) {
-        if (buffer.length < HEADER_LENGTH) return ParseResult.waitForMore();
+        return parse(buffer, 0, lastSequenceNumber);
+    }
+
+    public static ParseResult parse(byte[] buffer, int offset, int lastSequenceNumber) {
+        if (buffer.length - offset < HEADER_LENGTH) return ParseResult.waitForMore();
 
         DirectConnectPacket packet = new DirectConnectPacket();
-        packet.messageVersion = u8(buffer[0]);
-        packet.identifier = u8(buffer[1]);
-        packet.sequenceNumber = u8(buffer[2]);
-        packet.responseCode = u8(buffer[3]);
-        packet.length = (u8(buffer[4]) << 8) | u8(buffer[5]);
+        packet.messageVersion = u8(buffer[offset]);
+        packet.identifier = u8(buffer[offset + 1]);
+        packet.sequenceNumber = u8(buffer[offset + 2]);
+        packet.responseCode = u8(buffer[offset + 3]);
+        packet.length = (u8(buffer[offset + 4]) << 8) | u8(buffer[offset + 5]);
         int consumed = HEADER_LENGTH + packet.length;
-        if (buffer.length < consumed) return ParseResult.waitForMore();
+        if (buffer.length - offset < consumed) return ParseResult.waitForMore();
         if (packet.responseCode != RESP_SUCCESS) return ParseResult.ok(consumed, packet);
 
-        byte[] payload = Arrays.copyOfRange(buffer, HEADER_LENGTH, consumed);
+        byte[] payload = Arrays.copyOfRange(buffer, offset + HEADER_LENGTH, offset + consumed);
         boolean valid = packet.parsePayload(payload, lastSequenceNumber);
         return valid ? ParseResult.ok(consumed, packet) : ParseResult.error(consumed, packet);
     }
