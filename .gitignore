@@ -7,3 +7,8 @@ local.properties
 *.iml
 .DS_Store
 release.p12
+
+# Eclipse/Buildship IDE
+.classpath
+.project
+.settings/
