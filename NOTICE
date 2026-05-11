@@ -1,0 +1,17 @@
+fitzdircon is a derivative work. It is a simplified continuation focused on iFit2 / GlassOS consoles communicating directly with Zwift through Wahoo Direct Connect.
+
+This work is derived from:
+
+  QZ Companion Nordictrack Treadmill
+  Copyright (C) Al Udell and Roberto Viola (Cagnulein)
+  https://github.com/cagnulein/QZCompanionNordictrackTreadmill
+
+  QZ / qdomyos-zwift
+  Copyright (C) Roberto Viola (Cagnulein)
+  https://github.com/cagnulein/qdomyos-zwift
+
+Both upstream projects are licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
+fitzdircon is also licensed under AGPL-3.0. See LICENSE for the full license text.
+
+fitzdircon is not affiliated with, endorsed by, or sponsored by iFit, Zwift, Wahoo Fitness,
+NordicTrack, ProForm, or any of their parent companies.

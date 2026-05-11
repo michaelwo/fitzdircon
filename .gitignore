@@ -1,0 +1,9 @@
+.gradle/
+build/
+*.p12
+*.jks
+local.properties
+.idea/
+*.iml
+.DS_Store
+release.p12
