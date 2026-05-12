@@ -93,6 +93,7 @@ public class ZwiftDirectConnectService extends Service {
 
     private void publishTelemetry(Telemetry telemetry) {
         trainerState.apply(telemetry);
+        Log.d(LOG_TAG, "ftms " + telemetry.getClass().getSimpleName() + "=" + telemetry.value);
         ClientSession session = clientSession;
         if (session != null) session.publishIndoorBikeData();
     }

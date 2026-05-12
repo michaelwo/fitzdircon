@@ -114,7 +114,7 @@ Can a new contributor understand and extend the bridge without reading every fil
 | Dimension | Score | Notes |
 |-----------|-------|-------|
 | Test Coverage | 2 | DirectConnectPacketTest (22), DirectConnectProfileTest (24), DirectConnectTrainerStateTest (7), DirectConnectServiceInfoTest (1), DeviceControllerTest (2), TelemetryHubTest (1), GrpcDeviceCommandTest (5) — 62 tests total; core protocol and command delegation covered; missing: credential discovery, service lifecycle, TelemetryHub concurrency, IFitPlatform detection |
-| Observability | 1 | Structured FZ:* tags defined (FZ:Main, FZ:DirCon, FZ:Platform, FZ:Dispatch); no evidence of systematic event logging for connection state changes or post-ride analysis tooling |
+| Observability | 2 | Structured FZ:* tags; gRPC stream start/stop (FZ:Dispatch), workout state transitions, telemetry values at source (FZ:Dispatch `telemetry metric=value`) and at FTMS encoding point (FZ:DirCon `ftms Type=value`), stream errors all logged; `scripts/analyze-ride.sh` extracts ride duration, telemetry/command counts, connection timeline, and flags anomalies (missing telemetry, repeated reconnects, stream errors, credential failures) |
 | Protocol Compliance | 2 | Packet and profile unit tests cover encode/decode for all known frame types and FTMS characteristics; Python smoke test in `scripts/` exercises the full handshake; no automated compliance suite that acts as a Zwift client |
 | Credential Security | 2 | Crypto identification logic extracted to `CredentialIdentifier` (pure Java, no Android deps); 14 unit tests verify CA identification, client cert selection (CN match + fallback), key modulus matching, JPEG marker stripping, arsc scanning, and all `Exception` throw paths; `GrpcCredentials.load()` logs `Log.e("FZ:Platform", ...)` at each per-package failure and at final exhaustion |
 | Build Reproducibility | 2 | CI on every push; version from `version.properties`; versionCode from `github.run_number`; signed release APK on tag; GitHub Actions refs unpinned (e.g. `actions/checkout@v2`) |
@@ -122,7 +122,7 @@ Can a new contributor understand and extend the bridge without reading every fil
 | Telemetry Fidelity | 2 | `DirectConnectProfileTest` verifies FTMS encoding from known telemetry values; unit conversion formulas not independently documented; no logged commanded-vs-received comparison |
 | Documentation | 2 | README.md, CLAUDE.md (architecture + startup sequence), deploy-s22i-adb.md (8-step runbook); no standalone architecture diagram doc; runbooks not end-to-end verified |
 
-**Overall: 14 / 24**
+**Overall: 15 / 24**
 
 ---
 
@@ -131,7 +131,7 @@ Can a new contributor understand and extend the bridge without reading every fil
 | Dimension | Next action to reach score+1 |
 |-----------|------------------------------|
 | Test Coverage | Add `GrpcCredentialsTest` with a fixture `resources.arsc` containing known PEM blobs; add round-trip test: construct `Telemetry` values, push through `TelemetryHub`, verify FTMS bytes out |
-| Observability | Add `Log.d` at TCP accept/disconnect, gRPC stream start/stop, and mDNS registration events with state details; write a `scripts/analyze-ride.sh` that greps `adb logcat` output for FZ: tags and reports event timeline |
+| Observability | ✓ Done — gRPC stream start/stop, workout state, telemetry at source and FTMS point all logged; `scripts/analyze-ride.sh` reports event timeline and anomalies |
 | Protocol Compliance | Extend `scripts/` smoke test to act as a full Zwift client: subscribe to all FTMS/CSC characteristics and issue each control-point command type, asserting correct response codes |
 | Credential Security | ✓ Done — `CredentialIdentifier` extracted; 14 unit tests covering all identification paths; `Log.e` at failure sites |
 | Build Reproducibility | Pin all GitHub Actions workflow steps to their SHA digests using `actions/checkout@<sha>` etc.; add `release-notes` step that generates a changelog from commits since the last tag |

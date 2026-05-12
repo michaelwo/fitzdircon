@@ -1,6 +1,7 @@
 package org.fitzdircon.console.ifit2;
 
 import android.content.Context;
+import android.util.Log;
 
 import com.ifit.glassos.util.Empty;
 import com.ifit.glassos.workout.HeartRateServiceGrpc;
@@ -39,6 +40,7 @@ import io.grpc.stub.StreamObserver;
 import io.grpc.okhttp.OkHttpChannelBuilder;
 
 public final class GrpcTelemetryReader implements TelemetryReader {
+    private static final String LOG_TAG = "FZ:Dispatch";
     private static final Metadata.Key<String> CLIENT_ID_HEADER =
             Metadata.Key.of("client_id", Metadata.ASCII_STRING_MARSHALLER);
 
@@ -81,11 +83,13 @@ public final class GrpcTelemetryReader implements TelemetryReader {
             workoutAsync.workoutStateChanged(empty, new StreamObserver<WorkoutStateMessage>() {
                 @Override
                 public void onNext(WorkoutStateMessage event) {
+                    Log.d(LOG_TAG, "workout state: " + event.getWorkoutState());
                     if (event.getWorkoutState() == WorkoutState.WORKOUT_STATE_RUNNING) activateMetrics();
                     else deactivateMetrics();
                 }
                 @Override
                 public void onError(Throwable t) {
+                    Log.e(LOG_TAG, "gRPC workoutStateChanged error: " + t.getMessage());
                     onError.accept(t instanceof Exception ? (Exception) t : new Exception(t));
                 }
                 @Override
@@ -93,7 +97,9 @@ public final class GrpcTelemetryReader implements TelemetryReader {
             });
 
             started = true;
+            Log.i(LOG_TAG, "gRPC telemetry reader started");
         } catch (Exception e) {
+            Log.e(LOG_TAG, "gRPC telemetry reader start failed: " + e.getMessage());
             shutdown();
             IOException io = e instanceof IOException ? (IOException) e : new IOException(e);
             throw io;
@@ -102,6 +108,7 @@ public final class GrpcTelemetryReader implements TelemetryReader {
 
     private void activateMetrics() {
         if (!workoutActive.compareAndSet(false, true)) return;
+        Log.i(LOG_TAG, "gRPC metric streams starting");
         Empty empty = Empty.newBuilder().build();
 
         safePoll(() -> emit(new InclineTelemetry(
@@ -141,6 +148,7 @@ public final class GrpcTelemetryReader implements TelemetryReader {
 
     private void deactivateMetrics() {
         workoutActive.set(false);
+        Log.i(LOG_TAG, "gRPC metric streams inactive");
     }
 
     @Override
@@ -169,12 +177,15 @@ public final class GrpcTelemetryReader implements TelemetryReader {
         return new StreamObserver<T>() {
             @Override
             public void onNext(T value) {
+                Telemetry telemetry = mapper.map(value);
+                Log.d(LOG_TAG, "telemetry " + metric + "=" + telemetry.value);
                 onLine.accept("glassos: " + metric);
-                emit(mapper.map(value));
+                emit(telemetry);
             }
 
             @Override
             public void onError(Throwable t) {
+                Log.e(LOG_TAG, "gRPC " + metric + " stream error: " + t.getMessage());
                 onError.accept(t instanceof Exception ? (Exception) t : new Exception(t));
             }
 
@@ -193,6 +204,7 @@ public final class GrpcTelemetryReader implements TelemetryReader {
         if (channel != null) {
             channel.shutdownNow();
             channel = null;
+            Log.d(LOG_TAG, "gRPC channel shut down");
         }
     }
 
