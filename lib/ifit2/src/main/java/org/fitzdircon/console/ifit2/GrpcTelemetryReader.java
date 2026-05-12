@@ -79,22 +79,7 @@ public final class GrpcTelemetryReader implements TelemetryReader {
                 if (event.getWorkoutState() == WorkoutState.WORKOUT_STATE_RUNNING) activateMetrics();
             });
 
-            WorkoutServiceGrpc.WorkoutServiceStub workoutAsync = WorkoutServiceGrpc.newStub(channel);
-            workoutAsync.workoutStateChanged(empty, new StreamObserver<WorkoutStateMessage>() {
-                @Override
-                public void onNext(WorkoutStateMessage event) {
-                    Log.d(LOG_TAG, "workout state: " + event.getWorkoutState());
-                    if (event.getWorkoutState() == WorkoutState.WORKOUT_STATE_RUNNING) activateMetrics();
-                    else deactivateMetrics();
-                }
-                @Override
-                public void onError(Throwable t) {
-                    Log.e(LOG_TAG, "gRPC workoutStateChanged error: " + t.getMessage());
-                    onError.accept(t instanceof Exception ? (Exception) t : new Exception(t));
-                }
-                @Override
-                public void onCompleted() {}
-            });
+            subscribeWorkoutState();
 
             started = true;
             Log.i(LOG_TAG, "gRPC telemetry reader started");
@@ -104,6 +89,33 @@ public final class GrpcTelemetryReader implements TelemetryReader {
             IOException io = e instanceof IOException ? (IOException) e : new IOException(e);
             throw io;
         }
+    }
+
+    private void subscribeWorkoutState() {
+        if (channel == null) return;
+        WorkoutServiceGrpc.newStub(channel).workoutStateChanged(
+                Empty.newBuilder().build(),
+                new StreamObserver<WorkoutStateMessage>() {
+                    @Override
+                    public void onNext(WorkoutStateMessage event) {
+                        Log.d(LOG_TAG, "workout state: " + event.getWorkoutState());
+                        if (event.getWorkoutState() == WorkoutState.WORKOUT_STATE_RUNNING) activateMetrics();
+                        else deactivateMetrics();
+                    }
+
+                    @Override
+                    public void onError(Throwable t) {
+                        Log.e(LOG_TAG, "gRPC workoutStateChanged error: " + t.getMessage());
+                        onError.accept(t instanceof Exception ? (Exception) t : new Exception(t));
+                        if (started && channel != null) {
+                            Log.i(LOG_TAG, "gRPC workoutStateChanged resubscribing");
+                            subscribeWorkoutState();
+                        }
+                    }
+
+                    @Override
+                    public void onCompleted() {}
+                });
     }
 
     private void activateMetrics() {
@@ -125,25 +137,60 @@ public final class GrpcTelemetryReader implements TelemetryReader {
         safePoll(() -> emit(new HeartRateTelemetry((float) HeartRateServiceGrpc.newBlockingStub(channel)
                 .withDeadlineAfter(2, TimeUnit.SECONDS).getHeartRate(empty).getLastBpm())));
 
-        InclineServiceGrpc.InclineServiceStub incline = InclineServiceGrpc.newStub(channel);
-        ResistanceServiceGrpc.ResistanceServiceStub resistance = ResistanceServiceGrpc.newStub(channel);
-        SpeedServiceGrpc.SpeedServiceStub speed = SpeedServiceGrpc.newStub(channel);
-        RpmServiceGrpc.RpmServiceStub rpm = RpmServiceGrpc.newStub(channel);
-        WattsServiceGrpc.WattsServiceStub watts = WattsServiceGrpc.newStub(channel);
-        HeartRateServiceGrpc.HeartRateServiceStub heartRate = HeartRateServiceGrpc.newStub(channel);
+        subscribeIncline();
+        subscribeResistance();
+        subscribeSpeed();
+        subscribeRpm();
+        subscribeWatts();
+        subscribeHeartRate();
+    }
 
-        incline.inclineSubscription(empty, observer(v ->
-                new InclineTelemetry((float) v.getLastInclinePercent()), "incline"));
-        resistance.resistanceSubscription(empty, observer(v ->
-                new ResistanceTelemetry((float) v.getLastResistance()), "resistance"));
-        speed.speedSubscription(empty, observer(v ->
-                new SpeedTelemetry((float) v.getLastKph()), "speed"));
-        rpm.rpmSubscription(empty, observer(v ->
-                new CadenceTelemetry((float) v.getLastRpm()), "rpm"));
-        watts.wattsSubscription(empty, observer(v ->
-                new WattsTelemetry((float) v.getLastWatts()), "watts"));
-        heartRate.heartRateSubscription(empty, observer(v ->
-                new HeartRateTelemetry((float) v.getLastBpm()), "heartRate"));
+    private void subscribeIncline() {
+        if (!workoutActive.get() || channel == null) return;
+        InclineServiceGrpc.newStub(channel).inclineSubscription(
+                Empty.newBuilder().build(),
+                observer(v -> new InclineTelemetry((float) v.getLastInclinePercent()),
+                        "incline", this::subscribeIncline));
+    }
+
+    private void subscribeResistance() {
+        if (!workoutActive.get() || channel == null) return;
+        ResistanceServiceGrpc.newStub(channel).resistanceSubscription(
+                Empty.newBuilder().build(),
+                observer(v -> new ResistanceTelemetry((float) v.getLastResistance()),
+                        "resistance", this::subscribeResistance));
+    }
+
+    private void subscribeSpeed() {
+        if (!workoutActive.get() || channel == null) return;
+        SpeedServiceGrpc.newStub(channel).speedSubscription(
+                Empty.newBuilder().build(),
+                observer(v -> new SpeedTelemetry((float) v.getLastKph()),
+                        "speed", this::subscribeSpeed));
+    }
+
+    private void subscribeRpm() {
+        if (!workoutActive.get() || channel == null) return;
+        RpmServiceGrpc.newStub(channel).rpmSubscription(
+                Empty.newBuilder().build(),
+                observer(v -> new CadenceTelemetry((float) v.getLastRpm()),
+                        "rpm", this::subscribeRpm));
+    }
+
+    private void subscribeWatts() {
+        if (!workoutActive.get() || channel == null) return;
+        WattsServiceGrpc.newStub(channel).wattsSubscription(
+                Empty.newBuilder().build(),
+                observer(v -> new WattsTelemetry((float) v.getLastWatts()),
+                        "watts", this::subscribeWatts));
+    }
+
+    private void subscribeHeartRate() {
+        if (!workoutActive.get() || channel == null) return;
+        HeartRateServiceGrpc.newStub(channel).heartRateSubscription(
+                Empty.newBuilder().build(),
+                observer(v -> new HeartRateTelemetry((float) v.getLastBpm()),
+                        "heartRate", this::subscribeHeartRate));
     }
 
     private void deactivateMetrics() {
@@ -173,7 +220,7 @@ public final class GrpcTelemetryReader implements TelemetryReader {
         }
     }
 
-    private <T> StreamObserver<T> observer(Mapper<T> mapper, String metric) {
+    private <T> StreamObserver<T> observer(Mapper<T> mapper, String metric, Runnable resubscribe) {
         return new StreamObserver<T>() {
             @Override
             public void onNext(T value) {
@@ -187,6 +234,10 @@ public final class GrpcTelemetryReader implements TelemetryReader {
             public void onError(Throwable t) {
                 Log.e(LOG_TAG, "gRPC " + metric + " stream error: " + t.getMessage());
                 onError.accept(t instanceof Exception ? (Exception) t : new Exception(t));
+                if (workoutActive.get() && channel != null) {
+                    Log.i(LOG_TAG, "gRPC " + metric + " resubscribing");
+                    resubscribe.run();
+                }
             }
 
             @Override

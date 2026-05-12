@@ -118,11 +118,11 @@ Can a new contributor understand and extend the bridge without reading every fil
 | Protocol Compliance | 2 | Packet and profile unit tests cover encode/decode for all known frame types and FTMS characteristics; Python smoke test in `scripts/` exercises the full handshake; no automated compliance suite that acts as a Zwift client |
 | Credential Security | 2 | Crypto identification logic extracted to `CredentialIdentifier` (pure Java, no Android deps); 14 unit tests verify CA identification, client cert selection (CN match + fallback), key modulus matching, JPEG marker stripping, arsc scanning, and all `Exception` throw paths; `GrpcCredentials.load()` logs `Log.e("FZ:Platform", ...)` at each per-package failure and at final exhaustion |
 | Build Reproducibility | 2 | CI on every push; version from `version.properties`; versionCode from `github.run_number`; signed release APK on tag; GitHub Actions refs unpinned (e.g. `actions/checkout@v2`) |
-| Failure Resilience | 1 | `CrashHandler` logs uncaught exceptions to `SharedPreferences`; no systematic reconnection logic for gRPC streams, TCP client disconnects, or mDNS re-registration found |
+| Failure Resilience | 2 | TCP accept loop already re-accepts after client disconnect without restart; gRPC metric stream observers re-subscribe on error if workout is still active (`subscribeIncline` etc.); gRPC workout state stream re-subscribes on error; mDNS registration retried once on `onRegistrationFailed` via `mDnsRetried` guard; all failure paths log at error level |
 | Telemetry Fidelity | 2 | `DirectConnectProfileTest` verifies FTMS encoding from known telemetry values; unit conversion formulas not independently documented; no logged commanded-vs-received comparison |
 | Documentation | 2 | README.md, CLAUDE.md (architecture + startup sequence), deploy-s22i-adb.md (8-step runbook); no standalone architecture diagram doc; runbooks not end-to-end verified |
 
-**Overall: 15 / 24**
+**Overall: 16 / 24**
 
 ---
 
@@ -135,6 +135,6 @@ Can a new contributor understand and extend the bridge without reading every fil
 | Protocol Compliance | Extend `scripts/` smoke test to act as a full Zwift client: subscribe to all FTMS/CSC characteristics and issue each control-point command type, asserting correct response codes |
 | Credential Security | ✓ Done — `CredentialIdentifier` extracted; 14 unit tests covering all identification paths; `Log.e` at failure sites |
 | Build Reproducibility | Pin all GitHub Actions workflow steps to their SHA digests using `actions/checkout@<sha>` etc.; add `release-notes` step that generates a changelog from commits since the last tag |
-| Failure Resilience | Add TCP reconnection loop in `ZwiftDirectConnectService` (accept new client after disconnect without restart); add gRPC stream re-subscription in `GrpcTelemetryReader` on stream error |
+| Failure Resilience | ✓ Done — TCP accept loop already reconnects; gRPC metric streams re-subscribe per-metric on error; workout state stream re-subscribes; mDNS retried on failure; to reach 3: add per-subsystem graceful degradation (hold Zwift connection with stale state while gRPC reconnects, add exponential backoff) |
 | Telemetry Fidelity | Document each FTMS field encoding as a table in `DirectConnectProfile` (source unit → wire format → scale factor); add `@see` links from field assignments to the corresponding `DirectConnectProfileTest` assertion |
 | Documentation | Create `docs/architecture.md` with a data-flow diagram and class-role table for each module; verify `deploy-s22i-adb.md` runbook commands execute correctly end-to-end on the S22i |

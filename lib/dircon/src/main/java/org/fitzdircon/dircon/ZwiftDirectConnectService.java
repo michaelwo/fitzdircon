@@ -43,6 +43,7 @@ public class ZwiftDirectConnectService extends Service {
 
     private NsdManager nsdManager;
     private NsdManager.RegistrationListener registrationListener;
+    private boolean mDnsRetried = false;
     private ServerSocket serverSocket;
     private Thread serverThread;
     private volatile ClientSession clientSession = null;
@@ -75,6 +76,7 @@ public class ZwiftDirectConnectService extends Service {
         if (running) return;
         running = true;
         lastError = null;
+        mDnsRetried = false;
         subscribeTelemetry();
         registerService();
         startTcpServer();
@@ -123,6 +125,7 @@ public class ZwiftDirectConnectService extends Service {
         registrationListener = new NsdManager.RegistrationListener() {
             @Override public void onServiceRegistered(NsdServiceInfo nsdServiceInfo) {
                 advertising = true;
+                mDnsRetried = false;
                 lastError = null;
                 Log.i(LOG_TAG, "mDNS registered: " + nsdServiceInfo.getServiceName());
             }
@@ -131,6 +134,11 @@ public class ZwiftDirectConnectService extends Service {
                 advertising = false;
                 lastError = "mDNS registration failed: " + errorCode;
                 Log.e(LOG_TAG, lastError);
+                if (running && !mDnsRetried) {
+                    mDnsRetried = true;
+                    Log.i(LOG_TAG, "mDNS re-registration attempt after error " + errorCode);
+                    registerService();
+                }
             }
 
             @Override public void onServiceUnregistered(NsdServiceInfo serviceInfo) {
