@@ -4,19 +4,17 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
+import android.util.Log;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
-import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
 import java.security.PrivateKey;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
-import java.security.interfaces.RSAPrivateKey;
-import java.security.interfaces.RSAPublicKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.ArrayList;
 import java.util.List;
@@ -58,11 +56,13 @@ public final class GrpcCredentials {
                 String caPem   = readPem(resources, packageName, keys.ca,   "CERTIFICATE");
                 return new GrpcCredentials(buildSslContext(certPem, keyPem, caPem));
             } catch (Exception e) {
+                Log.e("FZ:Platform", "Credential discovery failed for " + packageName + ": " + e.getMessage());
                 failures.add(e);
             }
         }
         Exception e = new Exception("GlassOS credential resources not found in any known package");
         for (Exception f : failures) e.addSuppressed(f);
+        Log.e("FZ:Platform", "All credential packages exhausted: " + e.getMessage(), e);
         throw e;
     }
 
@@ -96,33 +96,33 @@ public final class GrpcCredentials {
         String apkPath = pm.getApplicationInfo(packageName, 0).sourceDir;
         Resources resources = pm.getResourcesForApplication(packageName);
 
-        List<CandidateCert> certCandidates = new ArrayList<>();
-        List<CandidateKey>  keyCandidates  = new ArrayList<>();
+        List<CredentialIdentifier.CandidateCert> certCandidates = new ArrayList<>();
+        List<CredentialIdentifier.CandidateKey>  keyCandidates  = new ArrayList<>();
 
         byte[] arsc = readArsc(apkPath);
-        for (String fullName : extractImgIconNames(arsc)) {
+        for (String fullName : CredentialIdentifier.extractImgIconNames(arsc)) {
             int id = resources.getIdentifier(fullName, "raw", packageName);
             if (id <= 0) continue;
             String key = fullName.substring("img_icon_".length());
-            String content = stripJpegMarkers(
+            String content = CredentialIdentifier.stripJpegMarkers(
                     new String(readFully(resources.openRawResource(id)), StandardCharsets.UTF_8));
 
             try {
                 String pem = "-----BEGIN CERTIFICATE-----\n" + content + "-----END CERTIFICATE-----\n";
                 X509Certificate cert = (X509Certificate) CertificateFactory.getInstance("X.509")
                         .generateCertificate(bytes(pem));
-                certCandidates.add(new CandidateCert(key, cert));
+                certCandidates.add(new CredentialIdentifier.CandidateCert(key, cert));
             } catch (Exception ignored) {}
 
             try {
                 String pem = "-----BEGIN PRIVATE KEY-----\n" + content + "-----END PRIVATE KEY-----\n";
-                keyCandidates.add(new CandidateKey(key, parsePrivateKey(pem)));
+                keyCandidates.add(new CredentialIdentifier.CandidateKey(key, parsePrivateKey(pem)));
             } catch (Exception ignored) {}
         }
 
-        CandidateCert ca     = findCa(certCandidates, packageName);
-        CandidateCert client = findClientCert(certCandidates, ca, packageName);
-        CandidateKey  key    = findMatchingKey(keyCandidates, client, packageName);
+        CredentialIdentifier.CandidateCert ca     = CredentialIdentifier.findCa(certCandidates, packageName);
+        CredentialIdentifier.CandidateCert client = CredentialIdentifier.findClientCert(certCandidates, ca, packageName);
+        CredentialIdentifier.CandidateKey  key    = CredentialIdentifier.findMatchingKey(keyCandidates, client, packageName);
 
         return new DiscoveredKeys(client.name, key.name, ca.name);
     }
@@ -133,77 +133,6 @@ public final class GrpcCredentials {
             if (entry == null) throw new Exception("resources.arsc not found in " + apkPath);
             return readFully(apk.getInputStream(entry));
         }
-    }
-
-    // Scans the binary resources.arsc for img_icon_* key strings. These are stored as UTF-8 in the
-    // package key string pool, so a simple byte scan finds them regardless of obfuscated file paths.
-    private static List<String> extractImgIconNames(byte[] arsc) {
-        List<String> names = new ArrayList<>();
-        byte[] prefix = "img_icon_".getBytes(StandardCharsets.UTF_8);
-        outer:
-        for (int i = 0; i <= arsc.length - prefix.length; i++) {
-            for (int j = 0; j < prefix.length; j++) {
-                if (arsc[i + j] != prefix[j]) continue outer;
-            }
-            int end = i + prefix.length;
-            while (end < arsc.length) {
-                byte b = arsc[end];
-                if ((b >= '0' && b <= '9') || (b >= 'a' && b <= 'f')) end++;
-                else break;
-            }
-            String name = new String(arsc, i, end - i, StandardCharsets.UTF_8);
-            if (!names.contains(name)) names.add(name);
-        }
-        return names;
-    }
-
-    private static CandidateCert findCa(List<CandidateCert> certs, String pkg) throws Exception {
-        for (CandidateCert c : certs)
-            if (c.cert.getSubjectX500Principal().equals(c.cert.getIssuerX500Principal())) return c;
-        throw new Exception("No self-signed CA certificate found in " + pkg);
-    }
-
-    private static CandidateCert findClientCert(List<CandidateCert> certs, CandidateCert ca,
-            String pkg) throws Exception {
-        CandidateCert first = null;
-        for (CandidateCert c : certs) {
-            if (c == ca) continue;
-            try {
-                c.cert.verify(ca.cert.getPublicKey());
-                if (CLIENT_ID_HEADER_VALUE.equals(certCn(c.cert))) return c;
-                if (first == null) first = c;
-            } catch (Exception ignored) {}
-        }
-        if (first != null) return first;
-        throw new Exception("No client certificate signed by CA found in " + pkg);
-    }
-
-    private static String certCn(X509Certificate cert) {
-        for (String part : cert.getSubjectX500Principal().getName().split(",")) {
-            part = part.trim();
-            if (part.startsWith("CN=")) return part.substring(3);
-        }
-        return "";
-    }
-
-    private static CandidateKey findMatchingKey(List<CandidateKey> keys, CandidateCert client,
-            String pkg) throws Exception {
-        if (!(client.cert.getPublicKey() instanceof RSAPublicKey))
-            throw new Exception("Client cert is not RSA in " + pkg);
-        BigInteger modulus = ((RSAPublicKey) client.cert.getPublicKey()).getModulus();
-        for (CandidateKey k : keys)
-            if (k.key instanceof RSAPrivateKey && ((RSAPrivateKey) k.key).getModulus().equals(modulus))
-                return k;
-        throw new Exception("No RSA private key matching client cert found in " + pkg);
-    }
-
-    private static String stripJpegMarkers(String content) {
-        StringBuilder sb = new StringBuilder();
-        for (String line : content.split("\n")) {
-            String t = line.trim();
-            if (!t.isEmpty() && !"FFD8".equals(t) && !"FFD9".equals(t)) sb.append(t).append('\n');
-        }
-        return sb.toString();
     }
 
     private static byte[] readFully(InputStream in) throws Exception {
@@ -222,15 +151,11 @@ public final class GrpcCredentials {
             throws Exception {
         int id = resources.getIdentifier("img_icon_" + key, "raw", packageName);
         if (id <= 0) throw new Resources.NotFoundException("img_icon_" + key);
-
-        StringBuilder body = new StringBuilder();
         try (InputStream in = resources.openRawResource(id)) {
-            for (String line : new String(readFully(in), StandardCharsets.UTF_8).split("\n")) {
-                String t = line.trim();
-                if (!t.isEmpty() && !"FFD8".equals(t) && !"FFD9".equals(t)) body.append(t).append('\n');
-            }
+            String body = CredentialIdentifier.stripJpegMarkers(
+                    new String(readFully(in), StandardCharsets.UTF_8));
+            return "-----BEGIN " + type + "-----\n" + body + "-----END " + type + "-----\n";
         }
-        return "-----BEGIN " + type + "-----\n" + body + "-----END " + type + "-----\n";
     }
 
     private static SSLContext buildSslContext(String certPem, String keyPem, String caPem)
@@ -279,15 +204,4 @@ public final class GrpcCredentials {
         DiscoveredKeys(String cert, String key, String ca) { this.cert = cert; this.key = key; this.ca = ca; }
     }
 
-    private static final class CandidateCert {
-        final String name;
-        final X509Certificate cert;
-        CandidateCert(String name, X509Certificate cert) { this.name = name; this.cert = cert; }
-    }
-
-    private static final class CandidateKey {
-        final String name;
-        final PrivateKey key;
-        CandidateKey(String name, PrivateKey key) { this.name = name; this.key = key; }
-    }
 }
