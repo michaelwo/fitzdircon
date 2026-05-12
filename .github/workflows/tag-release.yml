@@ -1,0 +1,26 @@
+name: Tag release
+
+on:
+  push:
+    branches: [main]
+    paths: [version.properties]
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Create version tag
+        run: |
+          VERSION=$(grep versionName version.properties | cut -d= -f2)
+          TAG="v${VERSION}"
+          if git ls-remote --tags origin "$TAG" | grep -q "$TAG"; then
+            echo "Tag $TAG already exists — skipping"
+          else
+            git tag "$TAG"
+            git push origin "$TAG"
+            echo "Pushed $TAG"
+          fi
