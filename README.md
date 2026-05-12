@@ -1,10 +1,10 @@
 # fitzdircon
 
-Bridges iFit GlassOS fitness consoles (treadmills, exercise bikes) to Zwift via the Zwift Direct Connect protocol.
+Bridges iFit2 GlassOS fitness consoles (treadmills, exercise bikes) to Zwift via the Zwift Direct Connect protocol.
 
 ## What it does
 
-fitzdircon runs on the iFit GlassOS Android device embedded in your fitness console. It advertises the machine over mDNS so Zwift can discover it on your local network, then accepts a TCP connection and streams live workout telemetry (speed, cadence, power, heart rate, resistance, incline) to Zwift using the FTMS Indoor Bike Data format. Resistance and incline commands sent by Zwift are forwarded back to the console hardware via the GlassOS gRPC interface.
+fitzdircon runs on the iFit2 GlassOS Android device embedded in your fitness console. It advertises the machine over mDNS so Zwift can discover it on your local network, then accepts a TCP connection and streams live workout telemetry (speed, cadence, power, heart rate, resistance, incline) to Zwift using the FTMS Indoor Bike Data format. Resistance and incline commands sent by Zwift are forwarded back to the console hardware via the GlassOS gRPC interface.
 
 ## Requirements
 
