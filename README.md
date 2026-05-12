@@ -17,7 +17,7 @@ fitzdircon runs on the iFit GlassOS Android device embedded in your fitness cons
 Download the latest signed APK from [GitHub Releases](../../releases) and sideload it onto the console:
 
 ```bash
-adb install fitzdircon-<version>-release.apk
+adb install fitzdircon-0.1.0-release.apk
 ```
 
 Or transfer the APK to the device and install via **Settings → Apps → Install unknown apps**.

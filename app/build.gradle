@@ -20,6 +20,8 @@ android {
     namespace 'org.fitzdircon'
     compileSdk 34
 
+    archivesBaseName = "fitzdircon-${versionProps['versionName']}"
+
     defaultConfig {
         applicationId "org.fitzdircon"
         minSdk 21
