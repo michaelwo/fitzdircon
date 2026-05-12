@@ -13,11 +13,16 @@ import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
 import java.security.PrivateKey;
 import java.security.cert.Certificate;
+import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateFactory;
+import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.ArrayList;
+import java.util.Base64;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -71,12 +76,11 @@ public final class GrpcCredentials {
         long currentVersion = pm.getPackageInfo(packageName, 0).versionCode;
         long cachedVersion  = prefs.getLong(packageName + "_version", -1);
 
-        if (cachedVersion == currentVersion) {
-            String cert = prefs.getString(packageName + "_cert", null);
-            String key  = prefs.getString(packageName + "_key",  null);
-            String ca   = prefs.getString(packageName + "_ca",   null);
-            if (cert != null && key != null && ca != null) return new DiscoveredKeys(cert, key, ca);
-        }
+        DiscoveredKeys cached = fromCache(currentVersion, cachedVersion,
+                prefs.getString(packageName + "_cert", null),
+                prefs.getString(packageName + "_key",  null),
+                prefs.getString(packageName + "_ca",   null));
+        if (cached != null) return cached;
 
         DiscoveredKeys keys = discoverKeys(pm, packageName);
         prefs.edit()
@@ -96,26 +100,36 @@ public final class GrpcCredentials {
         String apkPath = pm.getApplicationInfo(packageName, 0).sourceDir;
         Resources resources = pm.getResourcesForApplication(packageName);
 
-        List<CredentialIdentifier.CandidateCert> certCandidates = new ArrayList<>();
-        List<CredentialIdentifier.CandidateKey>  keyCandidates  = new ArrayList<>();
-
         byte[] arsc = readArsc(apkPath);
+        Map<String, byte[]> resourceContent = new LinkedHashMap<>();
         for (String fullName : CredentialIdentifier.extractImgIconNames(arsc)) {
             int id = resources.getIdentifier(fullName, "raw", packageName);
             if (id <= 0) continue;
             String key = fullName.substring("img_icon_".length());
-            String content = CredentialIdentifier.stripJpegMarkers(
-                    new String(readFully(resources.openRawResource(id)), StandardCharsets.UTF_8));
+            resourceContent.put(key, readFully(resources.openRawResource(id)));
+        }
+        return discoverFromCandidateContent(resourceContent, packageName);
+    }
+
+    static DiscoveredKeys discoverFromCandidateContent(
+            Map<String, byte[]> resourceContent, String packageName) throws Exception {
+        List<CredentialIdentifier.CandidateCert> certCandidates = new ArrayList<>();
+        List<CredentialIdentifier.CandidateKey>  keyCandidates  = new ArrayList<>();
+
+        for (Map.Entry<String, byte[]> entry : resourceContent.entrySet()) {
+            String key = entry.getKey();
+            String stripped = CredentialIdentifier.stripJpegMarkers(
+                    new String(entry.getValue(), StandardCharsets.UTF_8));
 
             try {
-                String pem = "-----BEGIN CERTIFICATE-----\n" + content + "-----END CERTIFICATE-----\n";
+                String pem = "-----BEGIN CERTIFICATE-----\n" + stripped + "-----END CERTIFICATE-----\n";
                 X509Certificate cert = (X509Certificate) CertificateFactory.getInstance("X.509")
                         .generateCertificate(bytes(pem));
                 certCandidates.add(new CredentialIdentifier.CandidateCert(key, cert));
             } catch (Exception ignored) {}
 
             try {
-                String pem = "-----BEGIN PRIVATE KEY-----\n" + content + "-----END PRIVATE KEY-----\n";
+                String pem = "-----BEGIN PRIVATE KEY-----\n" + stripped + "-----END PRIVATE KEY-----\n";
                 keyCandidates.add(new CredentialIdentifier.CandidateKey(key, parsePrivateKey(pem)));
             } catch (Exception ignored) {}
         }
@@ -123,8 +137,24 @@ public final class GrpcCredentials {
         CredentialIdentifier.CandidateCert ca     = CredentialIdentifier.findCa(certCandidates, packageName);
         CredentialIdentifier.CandidateCert client = CredentialIdentifier.findClientCert(certCandidates, ca, packageName);
         CredentialIdentifier.CandidateKey  key    = CredentialIdentifier.findMatchingKey(keyCandidates, client, packageName);
-
         return new DiscoveredKeys(client.name, key.name, ca.name);
+    }
+
+    static DiscoveredKeys fromCache(long currentVersion, long cachedVersion,
+            String cert, String key, String ca) {
+        if (cachedVersion == currentVersion && cert != null && key != null && ca != null)
+            return new DiscoveredKeys(cert, key, ca);
+        return null;
+    }
+
+    static void checkCertificateValidity(X509Certificate cert, String label) throws Exception {
+        try {
+            cert.checkValidity();
+        } catch (CertificateExpiredException e) {
+            throw new Exception("Certificate expired [" + label + "]: " + e.getMessage(), e);
+        } catch (CertificateNotYetValidException e) {
+            throw new Exception("Certificate not yet valid [" + label + "]: " + e.getMessage(), e);
+        }
     }
 
     private static byte[] readArsc(String apkPath) throws Exception {
@@ -163,6 +193,10 @@ public final class GrpcCredentials {
         CertificateFactory cf = CertificateFactory.getInstance("X.509");
         Certificate clientCert = cf.generateCertificate(bytes(certPem));
         Certificate caCert     = cf.generateCertificate(bytes(caPem));
+
+        checkCertificateValidity((X509Certificate) clientCert, "client");
+        checkCertificateValidity((X509Certificate) caCert, "ca");
+
         PrivateKey  privateKey = parsePrivateKey(keyPem);
 
         java.security.KeyStore keyStore = java.security.KeyStore.getInstance(
@@ -186,12 +220,13 @@ public final class GrpcCredentials {
         return sslContext;
     }
 
+    // GlassOS is API 26+; java.util.Base64 is safe here
     private static PrivateKey parsePrivateKey(String pem) throws Exception {
         String base64 = pem
                 .replace("-----BEGIN PRIVATE KEY-----", "")
                 .replace("-----END PRIVATE KEY-----", "")
                 .replaceAll("\\s+", "");
-        byte[] der = android.util.Base64.decode(base64, android.util.Base64.DEFAULT);
+        byte[] der = Base64.getDecoder().decode(base64);
         return KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(der));
     }
 
@@ -199,7 +234,7 @@ public final class GrpcCredentials {
         return new ByteArrayInputStream(s.getBytes(StandardCharsets.UTF_8));
     }
 
-    private static final class DiscoveredKeys {
+    static final class DiscoveredKeys {
         final String cert, key, ca;
         DiscoveredKeys(String cert, String key, String ca) { this.cert = cert; this.key = key; this.ca = ca; }
     }
