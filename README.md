@@ -4,7 +4,7 @@ Bridges iFit2 GlassOS Nordictrack fitness consoles (treadmills, exercise bikes) 
 
 ## What it does
 
-fitzdircon runs on the iFit2 GlassOS Android device embedded in your Nordictrack fitness console. It advertises the machine over mDNS so Zwift can discover it on your local network, then accepts a TCP connection and streams live workout telemetry (speed, cadence, power, heart rate, resistance, incline) to Zwift using the FTMS Indoor Bike Data format. Resistance and incline commands sent by Zwift are forwarded back to the console hardware via the GlassOS gRPC interface.
+fitzdircon runs on the iFit2 GlassOS Android device embedded in your Nordictrack fitness console. It advertises the machine over mDNS so Zwift can discover it on your local network (appearing as **iFit via fitzdircon** in Zwift's pairing screen), then accepts a TCP connection and streams live workout telemetry (speed, cadence, power, heart rate, resistance, incline) to Zwift using the FTMS Indoor Bike Data format. Resistance and incline commands sent by Zwift are forwarded back to the console hardware via the GlassOS gRPC interface.
 
 ## Requirements
 
@@ -13,6 +13,8 @@ fitzdircon runs on the iFit2 GlassOS Android device embedded in your Nordictrack
 - Android 5.0 (API 21) or higher on the console
 
 ## Installation
+
+> **New to this?** See the [Getting Started guide](docs/getting-started.md) for a plain-language, step-by-step walkthrough — no technical experience needed.
 
 Download the latest signed APK from [GitHub Releases](../../releases) and sideload it onto the console:
 

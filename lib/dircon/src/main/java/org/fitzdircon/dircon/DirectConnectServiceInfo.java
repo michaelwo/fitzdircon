@@ -6,7 +6,7 @@ import java.util.Map;
 
 public final class DirectConnectServiceInfo {
     public static final String SERVICE_TYPE = "_wahoo-fitness-tnp._tcp.";
-    public static final String DEFAULT_NAME = "Wahoo KICKR 0000";
+    public static final String DEFAULT_NAME = "iFit via fitzdircon";
     public static final int DEFAULT_PORT = 36866;
 
     public final String name;
@@ -19,7 +19,7 @@ public final class DirectConnectServiceInfo {
         this.type = SERVICE_TYPE;
         this.port = port;
         LinkedHashMap<String, String> records = new LinkedHashMap<>();
-        records.put("mac-address", "00:11:22:33:44");
+        records.put("mac-address", "AA:BB:CC:DD:EE:FF");
         records.put("serial-number", "0");
         records.put("ble-service-uuids",
                 "00001826-0000-1000-8000-00805F9B34FB,"
