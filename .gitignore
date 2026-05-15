@@ -15,3 +15,5 @@ release.p12
 
 # Local tooling
 .claude/
+
+scripts/__pycache__/
