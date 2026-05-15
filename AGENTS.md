@@ -35,5 +35,12 @@ Common commands:
 ./gradlew lint
 ```
 
-Release builds require signing environment variables and should not be used as the default validation path.
+In Codex Cloud, if `./gradlew` cannot download the Gradle distribution because the
+environment proxy blocks it, use the preinstalled `gradle` command instead:
 
+```bash
+gradle assembleDebug
+gradle test
+```
+
+Release builds require signing environment variables and should not be used as the default validation path.
