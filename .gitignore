@@ -13,7 +13,9 @@ release.p12
 .project
 .settings/
 
-# Local tooling
-.claude/
+# Ignore personal Claude files but track project-level settings and hooks
+.claude/*
+!.claude/settings.json
+!.claude/hooks
 
 scripts/__pycache__/
